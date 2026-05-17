@@ -63,35 +63,35 @@ export const fetchCart = async (): Promise<Cart> => {
 
 // POST /api/cart/add
 export const addToCart = async (menuId: number, quantity: number = 1): Promise<Cart> => {
-    const response = await apiClient.post<Cart>('/api/cart/add', { menuId, quantity });
+    const response = await apiClient.post<Cart>('api/cart/add', { menuId, quantity });
     notifyCartUpdate();
     return response.data;
 };
 
 // PUT /api/cart/decrease
 export const decreaseQuantity = async (menuId: number): Promise<Cart> => {
-    const response = await apiClient.put<Cart>('/api/cart/decrease', { menuId });
+    const response = await apiClient.put<Cart>('api/cart/decrease', { menuId });
     notifyCartUpdate();
     return response.data;
 };
 
 // DELETE /api/cart/remove/:menuId
 export const removeFromCart = async (menuId: number): Promise<Cart> => {
-    const response = await apiClient.delete<Cart>(`/api/cart/remove/${menuId}`);
+    const response = await apiClient.delete<Cart>(`api/cart/remove/${menuId}`);
     notifyCartUpdate();
     return response.data;
 };
 
 // DELETE /api/cart/clear
 export const clearCart = async (): Promise<{ message: string; cart: Cart }> => {
-    const response = await apiClient.delete<{ message: string; cart: Cart }>('/api/cart/clear');
+    const response = await apiClient.delete<{ message: string; cart: Cart }>('api/cart/clear');
     notifyCartUpdate();
     return response.data;
 };
 
 // POST /api/orders/checkout
 export const checkoutCart = async (): Promise<CheckoutResponse> => {
-    const response = await apiClient.post<CheckoutResponse>('/api/orders/checkout');
+    const response = await apiClient.post<CheckoutResponse>('api/orders/checkout');
     notifyCartUpdate();
     return response.data;
 };
