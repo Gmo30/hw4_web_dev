@@ -4,6 +4,8 @@ import { connectDB } from "./config/db.js";
 import cors from 'cors';
 
 import menuRoutes from "./routes/menuRoutes.js";
+import cartRoutes from "./routes/cartRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
 
 dotenv.config();
 
@@ -19,6 +21,8 @@ app.use(cors({
 }));
 
 app.use("/api/menu", menuRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
 
 connectDB().then(() => {
     app.listen(PORT, () => {

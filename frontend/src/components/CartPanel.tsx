@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useCart } from "./CartContext";
+import { 
+  fetchCart, 
+  addToCart, 
+  decreaseQuantity, 
+  removeFromCart, 
+  clearCart, 
+  checkoutCart, 
+  type Cart 
+} from "../api/cartApi";
 
 interface CartPanelProps {
   open: boolean;
@@ -7,8 +15,86 @@ interface CartPanelProps {
 }
 
 const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
-  const { cart, changeQty, removeFromCart, clearCart } = useCart();
-  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const [cartData, setCartData] = useState<Cart | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const loadCartData = async () => {
+      try {
+        const data = await fetchCart();
+        setCartData(data);
+      } catch (error) {
+        console.error("Failed to fetch cart:", error);
+      }
+    };
+
+    if (open) {
+      loadCartData();
+    }
+  }, [open]);
+
+  const handleQuantityChange = async (menuId: number, currentQuantity: number, delta: number) => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      let updatedCart;
+      if (delta === 1) {
+        updatedCart = await addToCart(menuId, 1);
+      } else if (delta === -1) {
+        updatedCart = await decreaseQuantity(menuId);
+      }
+      if (updatedCart) setCartData(updatedCart);
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveItem = async (menuId: number) => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const updatedCart = await removeFromCart(menuId);
+      setCartData(updatedCart);
+    } catch (error) {
+      console.error("Error removing item:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClearCart = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const response = await clearCart();
+      setCartData(response.cart);
+    } catch (error) {
+      console.error("Error clearing cart:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const response = await checkoutCart();
+      alert(response.message || "Order placed successfully!");
+      onClose();
+      setCartData(null);
+    } catch (error) {
+      console.error("Checkout failed:", error);
+      alert("Checkout failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cartItems = cartData?.items || [];
+  const total = cartData?.totalPrice || 0;
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 480);
   useEffect(() => {
@@ -38,7 +124,7 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
     borderRadius: "50%",
     border: "1px solid #e0c8c8",
     background: "transparent",
-    cursor: "pointer",
+    cursor: loading ? "not-allowed" : "pointer",
     fontSize: isMobile ? "1.1rem" : "1rem",
     color: "#8a5050",
     display: "flex",
@@ -46,20 +132,24 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
     justifyContent: "center",
     transition: "all 0.15s",
     flexShrink: 0,
+    opacity: loading ? 0.6 : 1,
   };
 
-  const hoverDark = (e: React.MouseEvent<HTMLElement>) =>
+  const hoverDark = (e: React.MouseEvent<HTMLElement>) => {
+    if (loading) return;
     Object.assign((e.currentTarget as HTMLElement).style, {
       background: "#2a1a1a",
       color: "white",
       borderColor: "#2a1a1a",
     });
-  const unhoverDark = (e: React.MouseEvent<HTMLElement>) =>
+  };
+  const unhoverDark = (e: React.MouseEvent<HTMLElement>) => {
     Object.assign((e.currentTarget as HTMLElement).style, {
       background: "transparent",
       color: "#8a5050",
       borderColor: "#e0c8c8",
     });
+  };
 
   return (
     <>
@@ -73,7 +163,6 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
           opacity: open ? 1 : 0,
           pointerEvents: open ? "auto" : "none",
           transition: "opacity 0.3s",
-          // Improve tap target on mobile
           WebkitTapHighlightColor: "transparent",
         }}
       />
@@ -126,7 +215,7 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
               margin: 0,
             }}
           >
-            Your Order
+            Your Order {loading && <span style={{ fontSize: "0.8rem", color: "#b85c5c" }}>(Updating...)</span>}
           </h2>
           <button
             onClick={onClose}
@@ -171,11 +260,10 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
             flex: 1,
             overflowY: "auto",
             padding: isMobile ? "0.75rem 1rem" : "1rem 1.2rem",
-            // Momentum scrolling on iOS
             WebkitOverflowScrolling: "touch",
           }}
         >
-          {cart.length === 0 ? (
+          {cartItems.length === 0 ? (
             <div
               style={{
                 textAlign: "center",
@@ -192,127 +280,139 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
               Add something to begin.
             </div>
           ) : (
-            cart.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: isMobile ? "0.65rem" : "0.8rem",
-                  padding: isMobile ? "0.9rem 0" : "0.85rem 0",
-                  borderBottom: "1px solid #f0e0e0",
-                }}
-              >
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  style={{
-                    width: isMobile ? 48 : 52,
-                    height: isMobile ? 48 : 52,
-                    borderRadius: 8,
-                    objectFit: "cover",
-                    flexShrink: 0,
-                  }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontFamily: "'Cormorant Garamond', serif",
-                      fontSize: isMobile ? "0.95rem" : "1rem",
-                      fontWeight: 400,
-                      color: "#2a1a1a",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {item.name}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "'Jost', sans-serif",
-                      fontSize: "0.85rem",
-                      color: "#b85c5c",
-                      fontWeight: 500,
-                      marginTop: 2,
-                    }}
-                  >
-                    ${(item.price * item.quantity).toFixed(2)}
-                  </div>
-                </div>
+            cartItems.map((item) => {
+              // Extract details populated by MongoDB backend
+              const details = item.menuItemDetails || {
+                name: `Item #${item.menuId}`,
+                imagePath: "",
+              };
 
+              return (
                 <div
+                  key={item.menuId}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: isMobile ? "0.45rem" : "0.35rem",
-                    flexShrink: 0,
+                    gap: isMobile ? "0.65rem" : "0.8rem",
+                    padding: isMobile ? "0.9rem 0" : "0.85rem 0",
+                    borderBottom: "1px solid #f0e0e0",
                   }}
                 >
-                  <button
-                    style={qtyBtnStyle}
-                    onClick={() => changeQty(item.id, -1)}
-                    aria-label={`Decrease quantity of ${item.name}`}
-                    onMouseEnter={hoverDark}
-                    onMouseLeave={unhoverDark}
-                  >
-                    −
-                  </button>
-                  <span
+                  {details.imagePath && (
+                    <img
+                      src={details.imagePath}
+                      alt={details.name}
+                      style={{
+                        width: isMobile ? 48 : 52,
+                        height: isMobile ? 48 : 52,
+                        borderRadius: 8,
+                        objectFit: "cover",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: "'Cormorant Garamond', serif",
+                        fontSize: isMobile ? "0.95rem" : "1rem",
+                        fontWeight: 400,
+                        color: "#2a1a1a",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {details.name}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'Jost', sans-serif",
+                        fontSize: "0.85rem",
+                        color: "#b85c5c",
+                        fontWeight: 500,
+                        marginTop: 2,
+                      }}
+                    >
+                      ${(item.price * item.quantity).toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div
                     style={{
-                      fontFamily: "'Jost', sans-serif",
-                      fontSize: "0.9rem",
-                      fontWeight: 500,
-                      minWidth: 20,
-                      textAlign: "center",
-                      color: "#2a1a1a",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: isMobile ? "0.45rem" : "0.35rem",
+                      flexShrink: 0,
                     }}
                   >
-                    {item.quantity}
-                  </span>
+                    <button
+                      style={qtyBtnStyle}
+                      disabled={loading}
+                      onClick={() => handleQuantityChange(item.menuId, item.quantity, -1)}
+                      aria-label={`Decrease quantity of ${details.name}`}
+                      onMouseEnter={hoverDark}
+                      onMouseLeave={unhoverDark}
+                    >
+                      −
+                    </button>
+                    <span
+                      style={{
+                        fontFamily: "'Jost', sans-serif",
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                        minWidth: 20,
+                        textAlign: "center",
+                        color: "#2a1a1a",
+                      }}
+                    >
+                      {item.quantity}
+                    </span>
+                    <button
+                      style={qtyBtnStyle}
+                      disabled={loading}
+                      onClick={() => handleQuantityChange(item.menuId, item.quantity, 1)}
+                      aria-label={`Increase quantity of ${details.name}`}
+                      onMouseEnter={hoverDark}
+                      onMouseLeave={unhoverDark}
+                    >
+                      +
+                    </button>
+                  </div>
+
                   <button
-                    style={qtyBtnStyle}
-                    onClick={() => changeQty(item.id, 1)}
-                    aria-label={`Increase quantity of ${item.name}`}
-                    onMouseEnter={hoverDark}
-                    onMouseLeave={unhoverDark}
+                    onClick={() => handleRemoveItem(item.menuId)}
+                    disabled={loading}
+                    title="Remove"
+                    aria-label={`Remove ${details.name} from cart`}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#c08080",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      fontSize: isMobile ? "1rem" : "0.9rem",
+                      padding: isMobile ? "0.4rem" : "0.2rem 0.3rem",
+                      opacity: 0.55,
+                      transition: "opacity 0.15s",
+                      flexShrink: 0,
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) (e.currentTarget as HTMLElement).style.opacity = "1";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) (e.currentTarget as HTMLElement).style.opacity = "0.55";
+                    }}
                   >
-                    +
+                    ✕
                   </button>
                 </div>
-
-                <button
-                  onClick={() => removeFromCart(item.id)}
-                  title="Remove"
-                  aria-label={`Remove ${item.name} from cart`}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#c08080",
-                    cursor: "pointer",
-                    // Bigger tap target on mobile
-                    fontSize: isMobile ? "1rem" : "0.9rem",
-                    padding: isMobile ? "0.4rem" : "0.2rem 0.3rem",
-                    opacity: 0.55,
-                    transition: "opacity 0.15s",
-                    flexShrink: 0,
-                    WebkitTapHighlightColor: "transparent",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.opacity = "1";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.opacity = "0.55";
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
-        {cart.length > 0 && (
+        {cartItems.length > 0 && (
           <div
             style={{
               padding: isMobile ? "1rem 1.2rem" : "1.2rem 1.5rem",
@@ -354,9 +454,11 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
             </div>
 
             <button
+              onClick={handleCheckout}
+              disabled={loading}
               style={{
                 width: "100%",
-                background: "#2a1a1a",
+                background: loading ? "#554444" : "#2a1a1a",
                 color: "#fdf6ec",
                 border: "none",
                 padding: isMobile ? "1rem" : "0.85rem",
@@ -366,23 +468,24 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
                 fontWeight: 400,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                cursor: "pointer",
+                cursor: loading ? "not-allowed" : "pointer",
                 transition: "background 0.18s",
                 marginBottom: "0.6rem",
                 WebkitTapHighlightColor: "transparent",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "#b85c5c";
+                if (!loading) (e.currentTarget as HTMLElement).style.background = "#b85c5c";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "#2a1a1a";
+                if (!loading) (e.currentTarget as HTMLElement).style.background = "#2a1a1a";
               }}
             >
-              Place Order
+              {loading ? "Processing..." : "Place Order"}
             </button>
 
             <button
-              onClick={clearCart}
+              onClick={handleClearCart}
+              disabled={loading}
               style={{
                 width: "100%",
                 background: "transparent",
@@ -394,22 +497,25 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
                 fontSize: "0.78rem",
                 fontWeight: 300,
                 letterSpacing: "0.06em",
-                cursor: "pointer",
+                cursor: loading ? "not-allowed" : "pointer",
                 transition: "all 0.15s",
                 WebkitTapHighlightColor: "transparent",
+                opacity: loading ? 0.6 : 1,
               }}
-              onMouseEnter={(e) =>
-                Object.assign((e.currentTarget as HTMLElement).style, {
-                  borderColor: "#b85c5c",
-                  color: "#b85c5c",
-                })
-              }
-              onMouseLeave={(e) =>
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  Object.assign((e.currentTarget as HTMLElement).style, {
+                    borderColor: "#b85c5c",
+                    color: "#b85c5c",
+                  });
+                }
+              }}
+              onMouseLeave={(e) => {
                 Object.assign((e.currentTarget as HTMLElement).style, {
                   borderColor: "#e0c8c8",
                   color: "#a07070",
-                })
-              }
+                });
+              }}
             >
               Clear Cart
             </button>

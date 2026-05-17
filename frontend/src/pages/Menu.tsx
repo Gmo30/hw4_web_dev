@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import api from '../api/axios';
-import { useCart } from "../components/CartContext";
+import { addToCart } from '../api/cartApi';
 
-// Define the shape of your menu item data
 export interface MenuItem {
   id: number;
   name: string;
@@ -12,23 +11,16 @@ export interface MenuItem {
 }
 
 const MenuPage: React.FC = () => {
-  const { addToCart } = useCart();
-  
-  // Add specific types to your state hooks
   const [flashedIds, setFlashedIds] = useState<Set<MenuItem['id']>>(new Set());
   const [toast, setToast] = useState<string>("");
   const [toastVisible, setToastVisible] = useState<boolean>(false);
   
-  // Type the timer ref to handle NodeJS/Browser setTimeout return types correctly
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  // Type the array state
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        // You can optionally type the expected return generic from axios
         const response = await api.get<MenuItem[]>("/api/menu");
         setMenuItems(response.data);
       } catch (error) {
@@ -38,25 +30,29 @@ const MenuPage: React.FC = () => {
     fetchMenu();
   }, []);
 
-  // Type the incoming item parameter
-  const handleAddToCart = (item: MenuItem) => {
-    addToCart(item);
+  const handleAddToCart = async (item: MenuItem) => {
+    try {
+      await addToCart(item.id, 1);
 
-    setFlashedIds((prev) => new Set(prev).add(item.id));
-    
-    setTimeout(() => {
-      setFlashedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(item.id);
-        return next;
-      });
-    }, 1200);
+      setFlashedIds((prev) => new Set(prev).add(item.id));
+      
+      setTimeout(() => {
+        setFlashedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+      }, 1200);
 
-    // Toast notification
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(`${item.name} added`);
-    setToastVisible(true);
-    toastTimer.current = setTimeout(() => setToastVisible(false), 2000);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      setToast(`${item.name} added`);
+      setToastVisible(true);
+      toastTimer.current = setTimeout(() => setToastVisible(false), 2000);
+
+    } catch (error) {
+      console.error("Failed to add to cart via API:", error);
+      alert("Could not add item to cart. Please try again.");
+    }
   };
 
   useEffect(() => {
@@ -110,24 +106,6 @@ const MenuPage: React.FC = () => {
         .add-btn:hover  { background: #b85c5c; }
         .add-btn:active { transform: scale(0.96); }
         .add-btn.added  { background: #4a7c59; }
-
-        .cart-toggle-btn {
-          background: #2a1a1a;
-          color: #fdf6ec;
-          border: none;
-          padding: 0.5rem 1.2rem;
-          border-radius: 50px;
-          font-family: 'Jost', sans-serif;
-          font-size: 0.85rem;
-          font-weight: 400;
-          letter-spacing: 0.04em;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          transition: background 0.18s;
-        }
-        .cart-toggle-btn:hover { background: #b85c5c; }
 
         .toast {
           position: fixed;

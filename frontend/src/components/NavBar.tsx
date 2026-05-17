@@ -1,12 +1,33 @@
-import React, { useState } from "react";
-import { useCart } from "./CartContext"
+import React, { useState, useEffect } from "react";
 import CartPanel from "./CartPanel";
 import { Link } from "react-router-dom";
+import { fetchCart } from "../api/cartApi";
+
 const Navbar: React.FC = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
-    const { cart } = useCart()
-    const totalItems = cart.reduce((sum, i) => sum + i.quantity, 0);
+    const [totalItems, setTotalItems] = useState(0);
+
+    useEffect(() => {
+        const updateCartBadgeCount = async () => {
+            try {
+                const data = await fetchCart();
+                const items = data?.items || [];
+                const count = items.reduce((sum, item) => sum + item.quantity, 0);
+                setTotalItems(count);
+            } catch (error) {
+                console.error("Failed to update navigation cart count:", error);
+            }
+        };
+
+        updateCartBadgeCount();
+
+        window.addEventListener("cartUpdated", updateCartBadgeCount);
+
+        return () => {
+            window.removeEventListener("cartUpdated", updateCartBadgeCount);
+        };
+    }, []);
 
     const navLinks = [
         { name: 'Menu', href: '/menu' },
@@ -14,6 +35,7 @@ const Navbar: React.FC = () => {
         { name: 'Contact', href: '/contact' },
         { name: 'Gallery', href: '/gallery' },
     ];
+
     return (
         <>
             <style>
