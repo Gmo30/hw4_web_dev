@@ -33,7 +33,7 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
     }
   }, [open]);
 
-  const handleQuantityChange = async (menuId: number, currentQuantity: number, delta: number) => {
+  const handleQuantityChange = async (menuId: number, delta: number) => {
     if (loading) return;
     setLoading(true);
     try {
@@ -349,7 +349,7 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
                     <button
                       style={qtyBtnStyle}
                       disabled={loading}
-                      onClick={() => handleQuantityChange(item.menuId, item.quantity, -1)}
+                      onClick={() => handleQuantityChange(item.menuId, -1)}
                       aria-label={`Decrease quantity of ${details.name}`}
                       onMouseEnter={hoverDark}
                       onMouseLeave={unhoverDark}
@@ -371,7 +371,7 @@ const CartPanel: React.FC<CartPanelProps> = ({ open, onClose }) => {
                     <button
                       style={qtyBtnStyle}
                       disabled={loading}
-                      onClick={() => handleQuantityChange(item.menuId, item.quantity, 1)}
+                      onClick={() => handleQuantityChange(item.menuId, 1)}
                       aria-label={`Increase quantity of ${details.name}`}
                       onMouseEnter={hoverDark}
                       onMouseLeave={unhoverDark}
